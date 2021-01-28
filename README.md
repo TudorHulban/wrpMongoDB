@@ -1,3 +1,8 @@
+# Interacting with NoSQL document databases: Mongo DB
+## Interface
+Suggested interface for interacting with document db in TODO: interface.go file.<br/>
+Package implements interface contract for Mongo DB.
+
 ### Docker Spin
 ```
 docker run --name c-mongo --restart=always -d -p 27017:27017 mongo mongod
