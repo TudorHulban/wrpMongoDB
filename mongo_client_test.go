@@ -14,101 +14,111 @@ import (
 )
 
 var (
-	john = moValue{
+	john = record{
 		Name:   "john",
 		Gender: "male",
 		Age:    44,
 	}
 
-	mary = moValue{
+	mary = record{
 		Name:   "mary",
 		Gender: "female",
 		Age:    44,
 	}
+
+	_logger = log.New(log.DEBUG, os.Stderr, true)
 )
 
 func testCfg() *Cfg {
 	return &Cfg{
-		TimeoutSecs: 3,
-		URL:         "mongodb://localhost:27017",
-		Database:    "testing",
-		Collection:  "persons",
-		l:           log.New(log.DEBUG, os.Stderr, true),
+		SecondsTimeoutExecution: 3,
+		URL:                     "mongodb://localhost:27017",
+		Database:                "testing",
+		Collection:              "persons",
 	}
 }
 
-// testInsertOne Helper for inserting one value.
-func testInsertOne(ctx context.Context, t *testing.T, m *MoInstance, v moValue) primitive.ObjectID {
-	j, errMarshall := json.Marshal(v)
-	require.Nil(t, errMarshall)
+func testInsertOne(ctx context.Context, t *testing.T, m *Client, value record) primitive.ObjectID {
+	valueMarshalled, errMarshall := json.Marshal(value)
+	require.NoError(t, errMarshall)
 
-	id, errInsert := m.InsertOne(ctx, j)
-	require.Nil(t, errInsert)
-	//assert.Greater(t, id, 0)
+	id, errInsert := m.InsertOne(ctx, valueMarshalled)
+	require.NoError(t, errInsert)
+	require.NotEmpty(t, id)
 
-	m.l.Printf("inserted ID: %s", id.String())
+	_logger.Printf(
+		"inserted ID: %s", id.String(),
+	)
+
 	return id
 }
 
 func TestInsertOne(t *testing.T) {
-	m, errNew := NewMongo(testCfg())
-	require.Nil(t, errNew, "connection to Mongo DB issues")
-	require.NotNil(t, m)
+	client, errNew := NewMongo(testCfg())
+	require.NoError(t,
+		errNew,
+		"connection to Mongo DB issues",
+	)
+	require.NotNil(t, client)
 
 	ctx := context.Background()
-	require.Nil(t, m.Connect(ctx), "could not connect")
-	defer m.Disconnect(ctx)
 
-	m.l.Debug("Prepare to insert john")
-	johnID := testInsertOne(ctx, t, m, john)
-	m.l.Print("johnID: ", johnID)
+	require.NoError(t,
+		client.Connect(ctx),
+		"could not connect",
+	)
+	defer client.Disconnect(ctx)
+
+	require.NotEmpty(t,
+		testInsertOne(ctx, t, client, john),
+	)
 }
 
 func TestFindByID(t *testing.T) {
-	m, errNew := NewMongo(testCfg())
-	require.Nil(t, errNew, "connection to Mongo DB issues")
-	require.NotNil(t, m)
+	client, errNew := NewMongo(testCfg())
+	require.NoError(t, errNew, "connection to Mongo DB issues")
+	require.NotNil(t, client)
 
 	ctx := context.Background()
-	require.Nil(t, m.Connect(ctx), "could not connect")
-	defer m.Disconnect(ctx)
+	require.NoError(t,
+		client.Connect(ctx),
+		"could not connect",
+	)
+	defer client.Disconnect(ctx)
 
-	m.l.Debug("Prepare to insert john")
-	johnID := testInsertOne(ctx, t, m, john)
-	m.l.Print("johnID: ", johnID)
+	johnID := testInsertOne(ctx, t, client, john)
 
-	record, errFindID := m.FindByID(ctx, johnID)
-	require.Nil(t, errFindID, "error find by ID")
+	record, errFindID := client.FindByID(ctx, johnID)
+	require.NoError(t, errFindID, "error find by ID")
 	require.NotNil(t, record)
-	m.l.Printf("--------- Found (1): %s", record)
+
+	_logger.Printf("found (1): %s", record)
 }
 
-// TestFindOneRecord Should find a record.
 func TestFindOneRecord(t *testing.T) {
 	m, errNew := NewMongo(testCfg())
-	require.Nil(t, errNew, "connection to Mongo DB issues")
+	require.NoError(t, errNew, "connection to Mongo DB issues")
 	require.NotNil(t, m)
 
 	ctx := context.Background()
-	require.Nil(t, m.Connect(ctx), "could not connect")
+	require.NoError(t, m.Connect(ctx), "could not connect")
 	defer m.Disconnect(ctx)
 
 	jsonJohn, errMarshall := json.Marshal(john)
 	require.Nil(t, errMarshall)
 
 	record, errFind := m.FindOne(ctx, jsonJohn)
-	require.Nil(t, errFind)
-	m.l.Printf("--------- Found (1): %s", record)
+	require.NoError(t, errFind)
+	require.NotNil(t, record)
 }
 
-// TestFindOneNoRecord Should not find a record.
 func TestFindOneNoRecord(t *testing.T) {
 	m, errNew := NewMongo(testCfg())
-	require.Nil(t, errNew, "connection to Mongo DB issues")
+	require.NoError(t, errNew, "connection to Mongo DB issues")
 	require.NotNil(t, m)
 
 	ctx := context.Background()
-	require.Nil(t, m.Connect(ctx), "could not connect")
+	require.NoError(t, m.Connect(ctx), "could not connect")
 	defer m.Disconnect(ctx)
 
 	// TODO: implementation.
@@ -117,11 +127,11 @@ func TestFindOneNoRecord(t *testing.T) {
 // TestFindMany Should find several records.
 func TestFindManyJSON(t *testing.T) {
 	m, errNew := NewMongo(testCfg())
-	require.Nil(t, errNew, "connection to Mongo DB issues")
+	require.NoError(t, errNew, "connection to Mongo DB issues")
 	require.NotNil(t, m)
 
 	ctx := context.Background()
-	require.Nil(t, m.Connect(ctx), "could not connect")
+	require.NoError(t, m.Connect(ctx), "could not connect")
 	defer m.Disconnect(ctx)
 
 	testInsertOne(ctx, t, m, mary)
@@ -130,70 +140,69 @@ func TestFindManyJSON(t *testing.T) {
 		age: 44,
 	}
 	jsonAge, errMarshall := json.Marshal(age)
-	require.Nil(t, errMarshall)
+	require.NoError(t, errMarshall)
 
 	record, errMany := m.FindManyFilterJSON(ctx, jsonAge)
-	require.Nil(t, errMany)
+	require.NoError(t, errMany)
 	assert.Greater(t, len(record), 2)
 
-	m.l.Printf("--------- Found (%d):", len(record))
 	for k, v := range record {
-		m.l.Print(k, v)
+		_logger.Print(k, v)
 	}
 }
 
 // TestDeleteOne Should delete one record provided the passed filter.
 func TestDeleteOne(t *testing.T) {
 	m, errNew := NewMongo(testCfg())
-	require.Nil(t, errNew, "connection to Mongo DB issues")
+	require.NoError(t, errNew, "connection to Mongo DB issues")
 	require.NotNil(t, m)
 
 	ctx := context.Background()
-	require.Nil(t, m.Connect(ctx), "could not connect")
+	require.NoError(t, m.Connect(ctx), "could not connect")
 	defer m.Disconnect(ctx)
 
 	jsonMary, errMarshall := json.Marshal(mary)
-	require.Nil(t, errMarshall)
+	require.NoError(t, errMarshall)
 
 	manyMaryBefore, errMany := m.FindManyFilterJSON(ctx, jsonMary)
 
 	_, errDelete := m.DeleteOne(ctx, jsonMary)
-	require.Nil(t, errDelete)
+	require.NoError(t, errDelete)
 
 	manyMaryAfter, errMany := m.FindManyFilterJSON(ctx, jsonMary)
-	require.Nil(t, errMany)
+	require.NoError(t, errMany)
 	assert.Equal(t, len(manyMaryAfter), len(manyMaryBefore)-1)
 }
 
 // TestDeleteAll Should delete all records for passed filter.
 func TestDeleteAll(t *testing.T) {
 	m, errNew := NewMongo(testCfg())
-	require.Nil(t, errNew, "connection to Mongo DB issues")
+	require.NoError(t, errNew, "connection to Mongo DB issues")
 	require.NotNil(t, m)
 
 	ctx := context.Background()
-	require.Nil(t, m.Connect(ctx), "could not connect")
+	require.NoError(t, m.Connect(ctx), "could not connect")
 	defer m.Disconnect(ctx)
 
 	raw, errMarshall := json.Marshal(john)
-	require.Nil(t, errMarshall)
+	require.NoError(t, errMarshall)
 
 	_, errDelete := m.DeleteAll(ctx, raw)
-	require.Nil(t, errDelete)
+	require.NoError(t, errDelete)
 
 	many, errMany := m.FindManyFilterJSON(ctx, raw)
-	require.Nil(t, errMany)
+	require.NoError(t, errMany)
 	assert.Equal(t, len(many), 0)
 }
 
 // TestUpdateByID Should update the record with passed ID.
 func TestUpdateByID(t *testing.T) {
 	m, errNew := NewMongo(testCfg())
-	require.Nil(t, errNew, "connection to Mongo DB issues")
+	require.NoError(t, errNew, "connection to Mongo DB issues")
 	require.NotNil(t, m)
 
 	ctx := context.Background()
-	require.Nil(t, m.Connect(ctx), "could not connect")
+	require.NoError(t, m.Connect(ctx), "could not connect")
 	defer m.Disconnect(ctx)
 
 	id := testInsertOne(ctx, t, m, mary)
@@ -202,25 +211,24 @@ func TestUpdateByID(t *testing.T) {
 	_, errUpdate := m.UpdateByID(ctx, id, bsonUpdate)
 	require.Nil(t, errUpdate)
 
-	maryUpdated := moValue{
+	maryUpdated := record{
 		Name:   "mary",
 		Gender: "female",
 		Age:    45,
 	}
 
 	raw, errMarshall := json.Marshal(maryUpdated)
-	require.Nil(t, errMarshall)
+	require.NoError(t, errMarshall)
 
 	record, errFind := m.FindOne(ctx, raw)
-	require.Nil(t, errFind)
+	require.NoError(t, errFind)
 	require.NotNil(t, record)
-	m.l.Printf("record: %s", record)
 }
 
 // TestUpdateOne Should update a record given passed data.
 func TestUpdateOne(t *testing.T) {
 	m, errNew := NewMongo(testCfg())
-	require.Nil(t, errNew, "connection to Mongo DB issues")
+	require.NoError(t, errNew, "connection to Mongo DB issues")
 	require.NotNil(t, m)
 
 	ctx := context.Background()
@@ -244,5 +252,5 @@ func TestUpdateOne(t *testing.T) {
 	}
 
 	_, errUpdate := m.UpdateOne(ctx, bsonFilter, bsonUpdate)
-	require.Nil(t, errUpdate)
+	require.NoError(t, errUpdate)
 }

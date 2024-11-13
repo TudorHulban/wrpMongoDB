@@ -6,16 +6,16 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-// jsonToBsonM converts raw JSON into binary JSON M(Map).
-func jsonToBsonM(theJSON []byte) (bson.M, error) {
+func jsonToBsonM(jsonRaw []byte) (bson.M, error) {
 	var result bson.M
 
-	return result, json.Unmarshal(theJSON, &result)
+	return result,
+		json.Unmarshal(jsonRaw, &result)
 }
 
-// jsonToBsonD converts raw JSON into binary JSON D(Slice).
-func jsonToBsonD(theJSON []byte) (bson.D, error) {
+func jsonToBsonD(jsonRaw []byte) (bson.D, error) {
 	var result bson.D
 
-	return result, json.Unmarshal(theJSON, &result)
+	return result,
+		json.Unmarshal(jsonRaw, &result)
 }
